@@ -1,0 +1,434 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Ultimate Apology Simulator</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background: radial-gradient(circle at center, #ffffff 0%, #e4e7ec 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* --- THE TEAR TANK --- */
+        #waterLevel {
+            position: absolute;
+            bottom: 0; left: 0; width: 100%; height: 0%; 
+            background: linear-gradient(180deg, rgba(41, 182, 246, 0.4) 0%, rgba(2, 119, 189, 0.7) 100%);
+            border-top: 4px solid rgba(255, 255, 255, 0.6);
+            z-index: 15; 
+            pointer-events: none;
+            transition: height 0.1s linear; 
+            backdrop-filter: blur(4px); 
+            -webkit-backdrop-filter: blur(4px);
+            will-change: height;
+        }
+
+        .draining { transition: height 1s cubic-bezier(0.25, 0.8, 0.25, 1) !important; }
+
+        /* --- START OVERLAY --- */
+        #startOverlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+            display: flex; justify-content: center; align-items: center;
+            z-index: 200;
+        }
+
+        .start-btn {
+            padding: 18px 45px; font-size: 1.6rem; 
+            background: linear-gradient(135deg, #ff6a88, #ff99ac);
+            color: white; border: none; border-radius: 40px; cursor: pointer;
+            font-weight: 800; letter-spacing: 1px;
+            box-shadow: 0 10px 25px rgba(255, 106, 136, 0.4);
+            animation: pulseStart 2s infinite alternate;
+        }
+        .start-btn:active { transform: scale(0.95); } /* Instant tap feedback */
+
+        /* --- CARTOON CHARACTER --- */
+        .simulator-container { display: flex; flex-direction: column; align-items: center; z-index: 10; }
+
+        .character {
+            width: 180px; height: 160px; background: #ffffff;
+            border-radius: 50% 50% 45% 45%; position: relative;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.08), inset 0 -10px 20px rgba(0,0,0,0.02);
+            animation: breathe 1.5s infinite ease-in-out;
+            border: 3px solid #e0e0e0; transition: all 0.5s ease;
+        }
+
+        #tearContainer {
+            position: absolute; top: 80px; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 3;
+        }
+
+        .ear {
+            width: 40px; height: 40px; background: #ffffff; border: 3px solid #e0e0e0;
+            position: absolute; top: -10px; border-radius: 50% 50% 0 0; z-index: -1;
+        }
+        .ear.left { left: 20px; transform: rotate(-15deg); }
+        .ear.right { right: 20px; transform: rotate(15deg); }
+        .pink-bow {
+            width: 30px; height: 20px; background: linear-gradient(135deg, #ff8fa3, #ff6b8b); 
+            position: absolute; top: 5px; left: 25px; border-radius: 5px; transform: rotate(-10deg);
+            z-index: 4; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .pink-bow::before, .pink-bow::after {
+            content: ''; position: absolute; width: 15px; height: 15px;
+            background: inherit; border-radius: 50%; top: 2px;
+        }
+        .pink-bow::before { left: -10px; } .pink-bow::after { right: -10px; }
+
+        .eye-container {
+            display: flex; justify-content: space-between; width: 110px;
+            position: absolute; top: 55px; left: 35px; z-index: 4;
+        }
+        .eye {
+            width: 38px; height: 38px; background: #1a1a1a;
+            border-radius: 50%; position: relative;
+        }
+        .eye::before {
+            content: ''; position: absolute; width: 16px; height: 16px;
+            background: white; border-radius: 50%; top: 4px; left: 4px; transition: all 0.3s ease;
+        }
+        .eye::after {
+            content: ''; position: absolute; width: 8px; height: 8px;
+            background: white; border-radius: 50%; bottom: 6px; right: 6px; transition: all 0.3s ease;
+        }
+
+        .blush {
+            width: 20px; height: 10px; background: rgba(255, 182, 193, 0.8);
+            border-radius: 50%; position: absolute; top: 85px; z-index: 1; filter: blur(2px);
+        }
+        .blush.left { left: 18px; } .blush.right { right: 18px; }
+        
+        .mouth {
+            width: 16px; height: 10px; border: 3px solid #444; border-bottom: transparent;
+            border-radius: 50% 50% 0 0; position: absolute; top: 94px; left: 82px; z-index: 2; 
+        }
+
+        /* --- STATE: FORGIVEN --- */
+        .character.saved .mouth {
+            border-bottom: 3px solid #444; border-top: transparent;
+            border-radius: 0 0 50% 50%; top: 90px; left: 80px;
+            height: 15px; width: 20px; background: rgba(255, 107, 139, 0.2); 
+        }
+        .character.saved .eye::before { transform: scale(1.3) translate(1px, 1px); }
+
+        /* --- STATE: PUNISHED --- */
+        .character.dead {
+            transform: rotate(180deg) scale(0.9); 
+            filter: grayscale(85%) sepia(15%); 
+            animation: floatDead 3.5s infinite ease-in-out;
+        }
+        .character.dead .mouth { border: none; background: #333; height: 16px; width: 14px; border-radius: 50%; top: 95px; left: 83px; }
+        .character.dead .blush { opacity: 0; }
+        .character.dead .pink-bow { filter: grayscale(100%); }
+        .character.dead .eye { background: transparent; border-radius: 0; }
+        .character.dead .eye::before, .character.dead .eye::after {
+            content: ''; position: absolute; width: 34px; height: 6px;
+            background: #333; top: 16px; left: 2px; border-radius: 3px;
+        }
+        .character.dead .eye::before { transform: rotate(45deg); }
+        .character.dead .eye::after { transform: rotate(-45deg); }
+
+        /* Tears (Optimized) */
+        .tear-stream {
+            position: absolute; width: 16px; height: 80px; /* Made taller to need fewer of them */        
+            background: linear-gradient(180deg, #29b6f6, #81d4fa); border-radius: 8px;   
+            opacity: 0.85; animation: pourDown 0.6s linear forwards;
+            will-change: transform;
+        }
+
+        /* Particles */
+        .particle { position: absolute; pointer-events: none; will-change: transform; }
+        .soul { font-size: 2.8rem; opacity: 0.8; z-index: 25; animation: floatUpSoul 3s ease-in forwards; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.2)); }
+        .heart-storm { font-size: 2.5rem; z-index: 5; animation: popAndFloat 2.5s ease-out forwards; filter: drop-shadow(0 4px 10px rgba(255,0,0,0.2)); }
+
+        /* --- BUTTONS --- */
+        .button-container { display: flex; gap: 25px; margin-top: 60px; position: relative; z-index: 50; }
+        .action-btn {
+            padding: 16px 40px; font-size: 1.25rem; font-weight: 800; border: none;
+            border-radius: 35px; cursor: pointer; color: white; position: relative;
+        }
+        .btn-forgive { background: linear-gradient(135deg, #4caf50, #2e7d32); animation: waveForgive 2.5s infinite; }
+        .btn-punish { background: linear-gradient(135deg, #f44336, #c62828); animation: wavePunish 2.5s infinite; }
+        .action-btn:active { transform: scale(0.95); }
+        .action-btn:disabled { filter: grayscale(100%); cursor: not-allowed; opacity: 0.6; animation: none !important; }
+
+        /* Reset Button */
+        #resetGameBtn {
+            position: fixed; top: 25px; right: 25px; padding: 12px 25px; font-size: 1.1rem;
+            font-weight: bold; background: rgba(0,0,0,0.7); color: white; border: none; border-radius: 25px;
+            cursor: pointer; z-index: 100; display: none; box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+            animation: popIn 0.3s forwards;
+        }
+
+        /* Modal Overlay (Fixes lag from heavy box-shadow) */
+        #modalDimmer {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 140;
+        }
+
+        /* Modals */
+        .modal {
+            display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: white; padding: 35px; border-radius: 24px; 
+            box-shadow: 0 20px 50px rgba(0,0,0,0.3); text-align: center; z-index: 150; max-width: 90%; width: 360px;
+            animation: popIn 0.3s forwards;
+        }
+        .modal h2 { margin-bottom: 10px; color: #1f2937; font-size: 1.8rem;}
+        .modal p { color: #4b5563; font-size: 1.1rem; line-height: 1.6; margin-bottom: 25px; }
+        .modal-btn { 
+            background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; border: none; 
+            padding: 12px 30px; border-radius: 25px; cursor: pointer; font-weight: bold; font-size: 1.1rem;
+        }
+
+        /* Keyframes */
+        @keyframes breathe { 0%, 100% { transform: scale(1) translateY(0); } 50% { transform: scale(1.03) translateY(-4px); } }
+        @keyframes floatDead { 0%, 100% { transform: rotate(180deg) scale(0.9) translateY(0); } 50% { transform: rotate(180deg) scale(0.9) translateY(15px); } }
+        @keyframes pourDown { 0% { transform: translateY(0) scaleX(1); opacity: 0.9; } 100% { transform: translateY(400px) scaleX(0.7); opacity: 0; } }
+        @keyframes floatUpSoul { 0% { transform: translateY(0) scale(0.8) rotate(-10deg); opacity: 0; } 20% { opacity: 0.9; } 100% { transform: translateY(-400px) scale(1.3) rotate(-10deg); opacity: 0; } }
+        @keyframes popAndFloat { 0% { transform: scale(0) rotate(0deg); opacity: 0; } 10% { transform: scale(1.5) rotate(15deg); opacity: 1; } 100% { transform: scale(1) translateY(-200px) rotate(-15deg); opacity: 0; } }
+        @keyframes popIn { 0% { transform: scale(0) translate(-50%, -50%); opacity: 0; } 100% { transform: scale(1) translate(-50%, -50%); opacity: 1; } }
+        @keyframes pulseStart { 0% { transform: scale(1); } 100% { transform: scale(1.05); } }
+        @keyframes waveForgive { 0%, 20% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.6); } 40% { box-shadow: 0 0 0 20px rgba(76, 175, 80, 0); } 100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); } }
+        @keyframes wavePunish { 0%, 50%, 70% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0.6); } 90% { box-shadow: 0 0 0 20px rgba(244, 67, 54, 0); } 100% { box-shadow: 0 0 0 0 rgba(244, 67, 54, 0); } }
+    </style>
+</head>
+<body>
+
+    <!-- Start Overlay -->
+    <div id="startOverlay">
+        <button class="start-btn" id="startBtn">Launch Simulator 🥺</button>
+    </div>
+
+    <!-- Floating Reset Button -->
+    <button id="resetGameBtn">🔄 Reset Simulator</button>
+
+    <!-- Water Level -->
+    <div id="waterLevel"></div>
+
+    <div class="simulator-container">
+        <!-- Character -->
+        <div class="character" id="character">
+            <div id="tearContainer"></div>
+            <div class="ear left"></div>
+            <div class="ear right"></div>
+            <div class="pink-bow"></div>
+            <div class="eye-container">
+                <div class="eye" id="leftEye"></div>
+                <div class="eye" id="rightEye"></div>
+            </div>
+            <div class="blush left"></div>
+            <div class="blush right"></div>
+            <div class="mouth"></div>
+        </div>
+    </div>
+
+    <!-- Choice Buttons -->
+    <div class="button-container" id="choiceUi">
+        <button class="action-btn btn-forgive" id="forgiveBtn">Forgive</button>
+        <button class="action-btn btn-punish" id="punishBtn">Punish</button>
+    </div>
+
+    <!-- Dim Background for Modals (Improves performance over heavy box-shadow) -->
+    <div id="modalDimmer"></div>
+
+    <!-- Forgive Modal -->
+    <div class="modal" id="forgiveModal">
+        <h2>Saved! 💖</h2>
+        <p>You forgave the sender and saved him.</p>
+        <button class="modal-btn" id="closeForgiveBtn">Got it!</button>
+    </div>
+
+    <!-- Punish Modal -->
+    <div class="modal" id="punishModal">
+        <h2>RIP 💀</h2>
+        <p>You have successfully punished the sender.</p>
+        <button class="modal-btn" style="background: linear-gradient(135deg, #ef4444, #b91c1c);" id="closePunishBtn">Got it!</button>
+    </div>
+
+    <script>
+        let voiceInterval, tearInterval, waterInterval, fxInterval;
+        let isPunished = false;
+        let isDead = false;
+        let isForgiven = false; 
+        let waterHeight = 0; 
+        
+        const tearContainer = document.getElementById('tearContainer');
+        const waterLevelEl = document.getElementById('waterLevel');
+        const characterEl = document.getElementById('character');
+        const forgiveBtn = document.getElementById('forgiveBtn');
+        const punishBtn = document.getElementById('punishBtn');
+        const dimmer = document.getElementById('modalDimmer');
+
+        // Audio
+        function voiceEngine() {
+            if ('speechSynthesis' in window && !isDead && !isForgiven) {
+                const speech = new SpeechSynthesisUtterance("sorry, I didn't mean that");
+                speech.pitch = 1.6; speech.rate = 0.9;  
+                window.speechSynthesis.speak(speech);
+            }
+        }
+
+        // Tears (Optimized intervals to fix lag)
+        function spawnWaterfallTears() {
+            if (isDead || isForgiven) return;
+            const wobbleL = isPunished ? (Math.random() * 20 - 10) : 0;
+            const wobbleR = isPunished ? (Math.random() * 20 - 10) : 0;
+            
+            const tearL = document.createElement('div');
+            tearL.classList.add('tear-stream');
+            tearL.style.left = `${46 + wobbleL}px`; tearL.style.top = `0px`;
+            
+            const tearR = document.createElement('div');
+            tearR.classList.add('tear-stream');
+            tearR.style.left = `${118 + wobbleR}px`; tearR.style.top = `0px`;
+
+            if (isPunished) {
+                tearL.style.width = "28px"; 
+                tearR.style.width = "28px"; 
+            }
+            tearContainer.appendChild(tearL);
+            tearContainer.appendChild(tearR);
+            setTimeout(() => { tearL.remove(); tearR.remove(); }, 600);
+        }
+
+        // Water Physics
+        function updateWaterLevel() {
+            if (isDead || isForgiven) return;
+            waterHeight += isPunished ? 3.5 : 0.2; 
+            if (!isPunished && waterHeight > 65) waterHeight = 65; 
+            waterLevelEl.style.height = `${waterHeight}%`;
+            if (waterHeight >= 100 && !isDead) triggerDeath();
+        }
+
+        // FX Generator
+        function spawnParticle(emoji, typeClass) {
+            const p = document.createElement('div');
+            p.innerText = emoji;
+            p.classList.add('particle', typeClass);
+            
+            if (typeClass === 'soul') {
+                const charRect = characterEl.getBoundingClientRect();
+                p.style.left = `${charRect.left + (Math.random() * charRect.width * 0.8)}px`;
+                p.style.top = `${charRect.top + 50}px`;
+            } else {
+                p.style.left = `${Math.random() * 90}vw`;
+                p.style.top = `${Math.random() * 90}vh`;
+                p.style.transform = `scale(${(Math.random() * 1.5) + 0.5})`;
+            }
+            document.body.appendChild(p);
+            setTimeout(() => p.remove(), 3000); // Shorter cleanup = less lag
+        }
+
+        // --- GAME EVENTS ---
+
+        function startSimulator() {
+            // Instant hide to prevent perceived lag
+            document.getElementById('startOverlay').style.display = 'none';
+            voiceEngine();
+            voiceInterval = setInterval(voiceEngine, 2400);
+            tearInterval = setInterval(spawnWaterfallTears, 80); // Less aggressive spawning
+            waterInterval = setInterval(updateWaterLevel, 50); 
+        }
+
+        function triggerDeath() {
+            isDead = true;
+            clearInterval(tearInterval); clearInterval(waterInterval);
+            if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+            
+            characterEl.classList.remove('saved');
+            characterEl.classList.add('dead');
+
+            forgiveBtn.disabled = true; punishBtn.disabled = true;
+
+            fxInterval = setInterval(() => spawnParticle('👻', 'soul'), 800);
+
+            // Shorter dramatic pause
+            setTimeout(() => { 
+                dimmer.style.display = 'block';
+                document.getElementById('punishModal').style.display = 'block'; 
+            }, 600);
+        }
+
+        function handleForgive() {
+            if (isDead || isForgiven || isPunished) return; 
+            isForgiven = true;
+            
+            forgiveBtn.disabled = true; punishBtn.disabled = true;
+
+            clearInterval(tearInterval); clearInterval(waterInterval);
+            waterLevelEl.classList.add('draining');
+            waterLevelEl.style.height = '0%';
+            characterEl.classList.add('saved');
+
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const happyVoice = new SpeechSynthesisUtterance("THANKS, I WILL DO NOT DO ANYTHING LIKE THAT AGAIN!");
+                happyVoice.pitch = 1.6; happyVoice.rate = 1.1; 
+                window.speechSynthesis.speak(happyVoice);
+            }
+
+            // Optimized burst (fewer elements, same visual)
+            for(let i = 0; i < 15; i++) setTimeout(() => spawnParticle('♥️', 'heart-storm'), i * 30);
+            fxInterval = setInterval(() => spawnParticle('♥️', 'heart-storm'), 250);
+
+            // Shorter dramatic pause
+            setTimeout(() => { 
+                dimmer.style.display = 'block';
+                document.getElementById('forgiveModal').style.display = 'block'; 
+            }, 400);
+        }
+
+        function handlePunish() {
+            if (isDead || isForgiven || isPunished) return; 
+            isPunished = true;
+            forgiveBtn.disabled = true; punishBtn.disabled = true;
+
+            clearInterval(tearInterval);
+            tearInterval = setInterval(spawnWaterfallTears, 30); // Faster, but not CPU-breaking
+
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                const scream = new SpeechSynthesisUtterance("Nooooo! Help me! I'm drowning!");
+                scream.pitch = 1.9; scream.rate = 1.3;
+                window.speechSynthesis.speak(scream);
+            }
+        }
+
+        function showResetButton(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+            dimmer.style.display = 'none';
+            document.getElementById('resetGameBtn').style.display = 'block';
+        }
+
+        // --- EVENT LISTENERS ---
+        document.getElementById('startBtn').addEventListener('click', startSimulator);
+        document.getElementById('forgiveBtn').addEventListener('click', handleForgive);
+        document.getElementById('punishBtn').addEventListener('click', handlePunish);
+        
+        document.getElementById('closeForgiveBtn').addEventListener('click', () => showResetButton('forgiveModal'));
+        document.getElementById('closePunishBtn').addEventListener('click', () => showResetButton('punishModal'));
+        document.getElementById('resetGameBtn').addEventListener('click', () => location.reload());
+
+    </script>
+</body>
+</html>
+
+
+```
