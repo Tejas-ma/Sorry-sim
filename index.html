@@ -379,7 +379,7 @@
 
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
-                const happyVoice = new SpeechSynthesisUtterance("THANKS, I WILL DO NOT DO ANYTHING LIKE THAT AGAIN!");
+                const happyVoice = new SpeechSynthesisUtterance("THANKS, I WILL NEVER DO ANYTHING LIKE THAT AGAIN!");
                 happyVoice.pitch = 1.6; happyVoice.rate = 1.1; 
                 window.speechSynthesis.speak(happyVoice);
             }
